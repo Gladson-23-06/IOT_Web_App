@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IOT App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #4CAF50;
+        }
+
+        .relay {
+            margin: 10px 0;
+        }
+
+        .relay button {
+            width: 120px;
+            height: 50px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>IOT App</h1>
+    <div id="status">Connecting to server...</div>
+    <div id="controls">
+        <div class="relay">
+            <label>Relay 1: </label>
+            <button id="relay_1" onclick="toggleRelay('relay_1')">OFF</button>
+        </div>
+        <div class="relay">
+            <label>Relay 2: </label>
+            <button id="relay_2" onclick="toggleRelay('relay_2')">OFF</button>
+        </div>
+        <div class="relay">
+            <label>Relay 3: </label>
+            <button id="relay_3" onclick="toggleRelay('relay_3')">OFF</button>
+        </div>
+        <div class="relay">
+            <label>Relay 4: </label>
+            <button id="relay_4" onclick="toggleRelay('relay_4')">OFF</button>
+        </div>
+    </div>
+
+    <script>
+        const serverUrl = "ws://localhost:8080"; // Update with your server URL
+        const socket = new WebSocket(serverUrl);
+
+        // Store relay states
+        let relayStates = {
+            relay_1: 0,
+            relay_2: 0,
+            relay_3: 0,
+            relay_4: 0,
+        };
+
+        // Update button states based on relay states
+        function updateButtons() {
+            Object.keys(relayStates).forEach(relay => {
+                const button = document.getElementById(relay);
+                if (button) {
+                    button.textContent = relayStates[relay] ? "ON" : "OFF";
+                    button.style.backgroundColor = relayStates[relay] ? "#4CAF50" : "#f44336";
+                }
+            });
+        }
+
+        // Toggle relay state and send update to server
+        function toggleRelay(relay) {
+            relayStates[relay] = relayStates[relay] ? 0 : 1;
+            updateButtons();
+
+            // Send updated state to server
+            socket.send(JSON.stringify({ [relay]: relayStates[relay] }));
+        }
+
+        // Handle WebSocket connection open
+        socket.onopen = () => {
+            document.getElementById("status").textContent = "Connected to server";
+            console.log("Connected to WebSocket server");
+        };
+
+        // Handle WebSocket messages
+        socket.onmessage = (event) => {
+            console.log("Message from server:", event.data);
+
+            // Update relay states and buttons
+            relayStates = JSON.parse(event.data);
+            updateButtons();
+        };
+
+        // Handle WebSocket errors
+        socket.onerror = (error) => {
+            console.error("WebSocket error:", error);
+            document.getElementById("status").textContent = "WebSocket error occurred!";
+        };
+
+        // Handle WebSocket close
+        socket.onclose = () => {
+            document.getElementById("status").textContent = "Disconnected from server";
+            console.log("WebSocket connection closed");
+        };
+    </script>
+</body>
+</html>
