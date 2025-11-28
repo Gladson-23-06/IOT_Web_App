@@ -1,112 +1,348 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IOT App</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
-        }
+  <meta charset="UTF-8" />
+  <title>Device Control – Firebase Binary 0000</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Firebase v8 CDN -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-        h1 {
-            color: #4CAF50;
-        }
-
-        .relay {
-            margin: 10px 0;
-        }
-
-        .relay button {
-            width: 120px;
-            height: 50px;
-            font-size: 18px;
-            cursor: pointer;
-        }
-    </style>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f7;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .container {
+      margin-top: 40px;
+      background: white;
+      padding: 20px 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      width: 360px;
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0 0 4px;
+    }
+    .sub {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 16px;
+    }
+    .status {
+      font-size: 12px;
+      margin-bottom: 12px;
+      color: #444;
+    }
+    .status span {
+      font-weight: 600;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      margin-left: 6px;
+    }
+    .badge-ok {
+      background: #e5f9ee;
+      color: #0f834d;
+    }
+    .badge-err {
+      background: #ffecec;
+      color: #c62828;
+    }
+    .device-card {
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .device-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .device-name {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .device-meta {
+      font-size: 11px;
+      color: #666;
+    }
+    .toggle-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .toggle-label {
+      font-size: 11px;
+      color: #444;
+    }
+    /* simple toggle */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 42px;
+      height: 22px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .2s;
+      border-radius: 22px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #4caf50;
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+    input:disabled + .slider {
+      background-color: #ddd;
+      cursor: not-allowed;
+    }
+    .raw {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #333;
+      padding-top: 8px;
+      border-top: 1px dashed #ddd;
+    }
+    .raw span {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      background: #f0f0f0;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+    .error {
+      color: #c62828;
+      font-size: 11px;
+      margin-top: 6px;
+    }
+  </style>
 </head>
 <body>
-    <h1>IOT App</h1>
-    <div id="status">Connecting to server...</div>
-    <div id="controls">
-        <div class="relay">
-            <label>Relay 1: </label>
-            <button id="relay_1" onclick="toggleRelay('relay_1')">OFF</button>
-        </div>
-        <div class="relay">
-            <label>Relay 2: </label>
-            <button id="relay_2" onclick="toggleRelay('relay_2')">OFF</button>
-        </div>
-        <div class="relay">
-            <label>Relay 3: </label>
-            <button id="relay_3" onclick="toggleRelay('relay_3')">OFF</button>
-        </div>
-        <div class="relay">
-            <label>Relay 4: </label>
-            <button id="relay_4" onclick="toggleRelay('relay_4')">OFF</button>
-        </div>
+<div class="container">
+  <h1>Zigbee Device Control</h1>
+  <div class="sub">Path: <code>/simpleStream/data</code> (format: <b>CCSS</b>)</div>
+
+  <div class="status" id="authStatus">Auth: <span>Signing in…</span></div>
+  <div class="status" id="streamStatus">Stream: <span>Waiting…</span></div>
+
+  <div class="device-card">
+    <div class="device-info">
+      <div class="device-name">Device 1</div>
+      <div class="device-meta" id="dev1Meta">Disconnected</div>
     </div>
+    <div class="toggle-wrapper">
+      <span class="toggle-label">State</span>
+      <label class="switch">
+        <input type="checkbox" id="dev1Toggle" disabled>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
 
-    <script>
-        const serverUrl = "ws://8402983eeb6f08ab7ef98d77ef1b56ed.serveo.net"; // Update with your server URL
-        const socket = new WebSocket(serverUrl);
+  <div class="device-card">
+    <div class="device-info">
+      <div class="device-name">Device 2</div>
+      <div class="device-meta" id="dev2Meta">Disconnected</div>
+    </div>
+    <div class="toggle-wrapper">
+      <span class="toggle-label">State</span>
+      <label class="switch">
+        <input type="checkbox" id="dev2Toggle" disabled>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
 
-        // Store relay states
-        let relayStates = {
-            relay_1: 0,
-            relay_2: 0,
-            relay_3: 0,
-            relay_4: 0,
-        };
+  <div class="raw">
+    Current binary: <span id="rawValue">0000</span>
+  </div>
+  <div class="error" id="errorArea"></div>
+</div>
 
-        // Update button states based on relay states
-        function updateButtons() {
-            Object.keys(relayStates).forEach(relay => {
-                const button = document.getElementById(relay);
-                if (button) {
-                    button.textContent = relayStates[relay] ? "ON" : "OFF";
-                    button.style.backgroundColor = relayStates[relay] ? "#4CAF50" : "#f44336";
-                }
-            });
-        }
+<script>
+  // ========= FILL THESE FROM YOUR FIREBASE CONSOLE =========
+//   const firebaseConfig = {
+//     apiKey: "AIzaSyDzlkTBW317sPY8W-TabETAQyOrOCK6gKY",
+//     authDomain: "YOUR_PROJECT_ID.firebaseapp.com",       // TODO
+//     databaseURL: "https://iot-app-hd-default-rtdb.firebaseio.com/",
+//     projectId: "YOUR_PROJECT_ID",                        // TODO
+//     storageBucket: "YOUR_PROJECT_ID.appspot.com",        // optional
+//     messagingSenderId: "YOUR_SENDER_ID",                 // optional
+//     appId: "YOUR_APP_ID"                                 // optional
+//   };
 
-        // Toggle relay state and send update to server
-        function toggleRelay(relay) {
-            relayStates[relay] = relayStates[relay] ? 0 : 1;
-            updateButtons();
+  const firebaseConfig = {
+  apiKey: "AIzaSyDzlkTBW317sPY8W-TabETAQyOrOCK6gKY",
+  authDomain: "iot-app-hd.firebaseapp.com",
+  databaseURL: "https://iot-app-hd-default-rtdb.firebaseio.com",
+  projectId: "iot-app-hd",
+  storageBucket: "iot-app-hd.firebasestorage.app",
+  messagingSenderId: "659125842358",
+  appId: "1:659125842358:web:63d378db738c9252f05117"
+};
 
-            // Send updated state to server
-            socket.send(JSON.stringify({ [relay]: relayStates[relay] }));
-        }
+  const USER_EMAIL    = "dongladson23623@gmail.com"; // ⚠ visible in frontend - dev only
+  const USER_PASSWORD = "230623";
 
-        // Handle WebSocket connection open
-        socket.onopen = () => {
-            document.getElementById("status").textContent = "Connected to server";
-            console.log("Connected to WebSocket server");
-        };
+  const authStatusEl   = document.getElementById('authStatus');
+  const streamStatusEl = document.getElementById('streamStatus');
+  const errorEl        = document.getElementById('errorArea');
 
-        // Handle WebSocket messages
-        socket.onmessage = (event) => {
-            console.log("Message from server:", event.data);
+  const dev1Toggle = document.getElementById('dev1Toggle');
+  const dev2Toggle = document.getElementById('dev2Toggle');
+  const dev1Meta   = document.getElementById('dev1Meta');
+  const dev2Meta   = document.getElementById('dev2Meta');
+  const rawValueEl = document.getElementById('rawValue');
 
-            // Update relay states and buttons
-            relayStates = JSON.parse(event.data);
-            updateButtons();
-        };
+  let latestValue = "0000"; // CCSS
 
-        // Handle WebSocket errors
-        socket.onerror = (error) => {
-            console.error("WebSocket error:", error);
-            document.getElementById("status").textContent = "WebSocket error occurred!";
-        };
+  function setAuthStatus(text, ok) {
+    authStatusEl.innerHTML = `Auth: <span>${text}</span>` +
+      `<span class="badge ${ok ? 'badge-ok' : 'badge-err'}">${ok ? 'OK' : 'ERR'}</span>`;
+  }
 
-        // Handle WebSocket close
-        socket.onclose = () => {
-            document.getElementById("status").textContent = "Disconnected from server";
-            console.log("WebSocket connection closed");
-        };
-    </script>
+  function setStreamStatus(text, ok) {
+    streamStatusEl.innerHTML = `Stream: <span>${text}</span>` +
+      (ok === undefined ? "" :
+        `<span class="badge ${ok ? 'badge-ok' : 'badge-err'}">${ok ? 'OK' : 'ERR'}</span>`);
+  }
+
+  function showError(msg) {
+    errorEl.textContent = msg || "";
+  }
+
+  // Normalize any value to a 4-char binary string "0000"
+  function normalizeValue(val) {
+    if (val === null || val === undefined) return "0000";
+    let s = String(val).trim();
+    s = s.replace(/[^01]/g, ""); // keep only 0/1 (defensive)
+    if (s.length < 4) s = s.padStart(4, "0");
+    if (s.length > 4) s = s.slice(-4);
+    return s;
+  }
+
+  // Update UI from latestValue
+  function updateUIFromBinary() {
+    const s = latestValue;
+    rawValueEl.textContent = s;
+
+    const conn1 = s[0] === "1";
+    const conn2 = s[1] === "1";
+    const state1 = s[2] === "1";
+    const state2 = s[3] === "1";
+
+    dev1Meta.textContent = conn1 ? "Connected" : "Disconnected";
+    dev2Meta.textContent = conn2 ? "Connected" : "Disconnected";
+
+    dev1Toggle.disabled = !conn1;
+    dev2Toggle.disabled = !conn2;
+
+    dev1Toggle.checked = state1;
+    dev2Toggle.checked = state2;
+  }
+
+  // Write new binary string back to RTDB
+  function writeBinary(newBinary) {
+    showError("");
+    const dbRef = firebase.database().ref("/simpleStream/data");
+    dbRef.set(newBinary)
+      .catch(err => {
+        console.error(err);
+        showError("Write failed: " + err.message);
+      });
+  }
+
+  // Called when user toggles device1 or device2
+  function onToggle(deviceIndex) {
+    let s = latestValue;
+    s = normalizeValue(s);
+    const arr = s.split(""); // [C1,C2,S1,S2]
+
+    if (deviceIndex === 1) {
+      // device 1 → state bit index 2
+      arr[2] = dev1Toggle.checked ? "1" : "0";
+    } else if (deviceIndex === 2) {
+      // device 2 → state bit index 3
+      arr[3] = dev2Toggle.checked ? "1" : "0";
+    }
+
+    const newVal = arr.join("");
+    latestValue = newVal;
+    updateUIFromBinary();
+    writeBinary(newVal);
+  }
+
+  dev1Toggle.addEventListener('change', () => onToggle(1));
+  dev2Toggle.addEventListener('change', () => onToggle(2));
+
+  // Init Firebase + Auth + Stream
+  firebase.initializeApp(firebaseConfig);
+
+  setAuthStatus("Signing in…", false);
+  setStreamStatus("Waiting for app ready…");
+
+  firebase.auth().signInWithEmailAndPassword(USER_EMAIL, USER_PASSWORD)
+    .then(() => {
+      setAuthStatus("Signed in", true);
+
+      const dbRef = firebase.database().ref("/simpleStream/data");
+
+      // Initial read + stream
+      setStreamStatus("Subscribing…");
+      dbRef.on("value", (snap) => {
+        const val = snap.val();
+        latestValue = normalizeValue(val);
+        setStreamStatus("Active", true);
+        updateUIFromBinary();
+      }, (err) => {
+        console.error(err);
+        setStreamStatus("Error", false);
+        showError("Stream error: " + err.message);
+      });
+    })
+    .catch(err => {
+      console.error(err);
+      setAuthStatus("Auth failed", false);
+      showError("Auth error: " + err.message);
+    });
+</script>
 </body>
 </html>
